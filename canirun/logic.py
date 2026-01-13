@@ -13,9 +13,10 @@ logger = logging.getLogger(__name__)
 
 
 class ModelAnalyzer:
-    def __init__(self, model_id, verbose=True):
+    def __init__(self, model_id, verbose=True, hf_token=None):
         self.model_id = model_id
         self.verbose = verbose
+        self.hf_token = hf_token
 
         # Adjust log level based on verbosity
         if not self.verbose:
@@ -23,12 +24,19 @@ class ModelAnalyzer:
         else:
             logger.setLevel(logging.INFO)
 
+        # Login to Hugging Face if token is provided
+        self._login()
+
         self.specs = self._get_specs()
         logger.info(
             f"Detected Hardware: {self.specs['name']} | "
             f"VRAM: {get_human_readable_size(self.specs['vram'])} | "
             f"RAM: {get_human_readable_size(self.specs['ram'])}"
         )
+
+    def _login(self):
+        if self.hf_token:
+            login(self.hf_token)
 
     def _get_specs(self):
         """Detects System RAM and VRAM (CUDA or Apple Silicon)."""
@@ -79,6 +87,13 @@ class ModelAnalyzer:
             }
         except Exception as e:
             logger.error(f"Error fetching config for {self.model_id}: {e}")
+            if not self.hf_token and (
+                "401" in str(e) or "403" in str(e) or "gated" in str(e).lower()
+            ):
+                logger.error(
+                    "Tip: This model might be gated or private. "
+                    "Please provide a Hugging Face token using --hf-token or set the HF_TOKEN environment variable."
+                )
             return None
 
     def calculate(self, data, ctx=4096):

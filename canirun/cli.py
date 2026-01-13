@@ -10,8 +10,11 @@ from .logic import ModelAnalyzer
 @click.command()
 @click.argument("model_id")
 @click.option("--ctx", default=2048, help="Context length to simulate (default: 2048)")
+@click.option(
+    "--hf-token", default=None, help="Hugging Face API token for gated or private models"
+)
 @click.option("--verbose", is_flag=True, default=False, help="Enable detailed logging")
-def main(model_id, ctx, verbose):
+def main(model_id, ctx, hf_token, verbose):
     """
     LLM Memory Analyzer: Estimates if a model fits in your VRAM/RAM.
     """
@@ -19,7 +22,7 @@ def main(model_id, ctx, verbose):
     log_level = logging.INFO if verbose else logging.WARNING
     logging.basicConfig(format="%(levelname)s: %(message)s", level=log_level)
 
-    analyzer = ModelAnalyzer(model_id, verbose=verbose)
+    analyzer = ModelAnalyzer(model_id, verbose=verbose, hf_token=hf_token)
     model_data = analyzer.fetch_model_data()
 
     if not model_data:

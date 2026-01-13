@@ -1,4 +1,5 @@
 import unittest
+from unittest.mock import patch
 
 from canirun.enum import COMPATIBILITY
 from canirun.logic import ModelAnalyzer
@@ -39,6 +40,25 @@ class TestModelAnalyzer(unittest.TestCase):
         # 14GB = 14 * 1024^3 bytes
         gb = 1024**3
         self.assertGreater(first_result["total_ram"], 14 * gb)
+
+    @patch("canirun.logic.model_info")
+    @patch("canirun.logic.hf_hub_download")
+    def test_fetch_model_data_auth_error(self, mock_download, mock_info):
+        # Setup mock to raise 401 error
+        mock_download.side_effect = Exception("401 Client Error: Unauthorized for url")
+        mock_info.side_effect = Exception("Some error")
+
+        with patch("psutil.virtual_memory") as mock_vm:
+            mock_vm.return_value.total = 16 * 1024**3
+
+            with self.assertLogs("canirun.logic", level="ERROR") as cm:
+                self.analyzer.fetch_model_data()
+
+            # Check if the tip message is in the logs
+            found_tip = any(
+                "Tip: This model might be gated or private" in log for log in cm.output
+            )
+            self.assertTrue(found_tip, f"Tip not found in logs: {cm.output}")
 
 
 if __name__ == "__main__":

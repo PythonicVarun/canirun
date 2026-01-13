@@ -36,7 +36,10 @@ class AnalysisResult:
 
 
 def canirun(
-    model_id: str, context_length: int = 2048, verbose: bool = False
+    model_id: str,
+    context_length: int = 2048,
+    verbose: bool = False,
+    hf_token: Optional[str] = None,
 ) -> Optional[AnalysisResult]:
     """
     Analyzes memory usage for a given model on the current hardware.
@@ -45,12 +48,13 @@ def canirun(
         model_id (str): Hugging Face model ID.
         context_length (int): Context window size (default: 2048).
         verbose (bool): Enable detailed logs (default: False).
+        hf_token (Optional[str]): Hugging Face API token for gated or private models (default: None).
 
     Returns:
         AnalysisResult: An object containing hardware specs and compatibility results.
                         Returns None if model data fetch fails.
     """
-    analyzer = ModelAnalyzer(model_id, verbose=verbose)
+    analyzer = ModelAnalyzer(model_id, verbose=verbose, hf_token=hf_token)
     model_data = analyzer.fetch_model_data()
 
     if not model_data:
