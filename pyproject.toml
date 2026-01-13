@@ -1,6 +1,6 @@
 [project]
 name = "canirun"
-version = "1.0.0"
+version = "1.0.0-post1"
 description = "Check if you can run a Hugging Face model locally."
 readme = "README.md"
 authors = [{ name = "Varun Agnihotri", email = "hello@pythonicvarun.me" }]
