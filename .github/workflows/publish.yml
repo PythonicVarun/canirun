@@ -9,12 +9,27 @@ permissions:
   contents: write
 
 jobs:
+  get-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=${GITHUB_REF_NAME#v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
   build-and-release:
     name: Build and Release
+    needs: get-version
     runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
+    environment:
+      name: pypi
+      url: https://pypi.org/project/canirun/${{ needs.get-version.outputs.version }}/
 
     steps:
       - uses: actions/checkout@v4
