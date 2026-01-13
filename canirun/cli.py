@@ -3,15 +3,19 @@ import logging
 import click
 from tabulate import tabulate
 
+from . import __version__
 from .human_readable import get_human_readable_size, get_human_readable_status
 from .logic import ModelAnalyzer
 
 
 @click.command()
+@click.version_option(__version__, prog_name="canirun", message="%(prog)s v%(version)s")
 @click.argument("model_id")
 @click.option("--ctx", default=2048, help="Context length to simulate (default: 2048)")
 @click.option(
-    "--hf-token", default=None, help="Hugging Face API token for gated or private models"
+    "--hf-token",
+    default=None,
+    help="Hugging Face API token for gated or private models",
 )
 @click.option("--verbose", is_flag=True, default=False, help="Enable detailed logging")
 def main(model_id, ctx, hf_token, verbose):
