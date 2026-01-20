@@ -2,8 +2,16 @@
 
 A lightweight CLI to estimate hardware requirements and quantization compatibility for Hugging Face models.
 
-[![PyPI version](https://badge.fury.io/py/canirun.svg)](https://badge.fury.io/py/canirun)
+[![codecov](https://codecov.io/github/PythonicVarun/canirun/branch/master/graph/badge.svg?token=FHPEETQPA7)](https://codecov.io/github/PythonicVarun/canirun)
+[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/canirun)](https://pypi.org/project/canirun)
+[![PyPI - Version](https://img.shields.io/pypi/v/canirun)
+](https://pypi.org/project/canirun)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Linting: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+
+> [!NOTE]
+> Currently optimized for standard Transformer architectures (Llama, Mistral, Gemma, BERT). MoE and custom architectures may have experimental support.
 
 ## Key Features
 
@@ -39,7 +47,7 @@ canirun meta-llama/Meta-Llama-3-8B --ctx 4096
 This will produce a report like this:
 
 ```
- 🔍 ANALYSIS REPORT: meta-llama/Meta-Llama-3-8B 
+ 🔍 ANALYSIS REPORT: meta-llama/Meta-Llama-3-8B
  Context Length  : 4096
  Device          : NVIDIA GeForce RTX 3090
  VRAM / RAM      : 24.0 GB / 64.0 GB
@@ -90,6 +98,20 @@ else:
 4. Comparing the estimated memory requirements with your system's available VRAM (if a GPU is detected) or RAM.
 
 The tool checks for different levels of quantization to see if a smaller, quantized version of the model could fit.
+
+## Development
+
+This project maintains strict code quality standards:
+
+[![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
+[![Linting: Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![Checked with mypy](https://www.mypy-lang.org/static/mypy_badge.svg)](https://mypy-lang.org/)
+[![Imports: isort](https://img.shields.io/badge/%20imports-isort-%231674b1?style=flat&labelColor=ef8336)](https://pycqa.github.io/isort/)
+
+- **Formatter**: Black
+- **Linter**: Ruff
+- **Type Checking**: MyPy (Strict)
+- **Docstrings**: Google Style
 
 ## License
 
