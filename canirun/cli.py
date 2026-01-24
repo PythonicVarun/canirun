@@ -1,3 +1,5 @@
+"""Command-line interface for canirun."""
+
 import logging
 
 import click
@@ -18,9 +20,19 @@ from .logic import ModelAnalyzer
     help="Hugging Face API token for gated or private models",
 )
 @click.option("--verbose", is_flag=True, default=False, help="Enable detailed logging")
-def main(model_id, ctx, hf_token, verbose):
-    """
-    LLM Memory Analyzer: Estimates if a model fits in your VRAM/RAM.
+def main(
+    model_id: str,
+    ctx: int,
+    hf_token: str | None,
+    verbose: bool,
+) -> None:
+    """LLM Memory Analyzer: Estimates if a model fits in your VRAM/RAM.
+
+    Args:
+        model_id: The Hugging Face model ID.
+        ctx: Context length to simulate.
+        hf_token: Hugging Face API token for gated or private models.
+        verbose: Enable detailed logging.
     """
     # Configure logging based on verbosity
     log_level = logging.INFO if verbose else logging.WARNING

@@ -1,12 +1,20 @@
 import unittest
+from typing import Any
 from unittest.mock import patch
 
 from canirun import COMPATIBILITY, canirun
 
 
 class TestApi(unittest.TestCase):
+    """Test suite for the API module."""
+
     @patch("canirun.api.ModelAnalyzer")
-    def test_canirun_supported(self, MockAnalyzer):
+    def test_canirun_supported(self, MockAnalyzer: Any) -> None:
+        """Tests canirun with a supported model.
+
+        Args:
+            MockAnalyzer: Mock object for ModelAnalyzer.
+        """
         # Setup mock for a supported model
         instance = MockAnalyzer.return_value
         instance.fetch_model_data.return_value = {"some": "data"}
@@ -39,7 +47,12 @@ class TestApi(unittest.TestCase):
         self.assertEqual(report[0]["quant"], "FP16")
 
     @patch("canirun.api.ModelAnalyzer")
-    def test_canirun_not_supported(self, MockAnalyzer):
+    def test_canirun_not_supported(self, MockAnalyzer: Any) -> None:
+        """Tests canirun with an unsupported model.
+
+        Args:
+            MockAnalyzer: Mock object for ModelAnalyzer.
+        """
         # Setup mock for an unsupported model
         instance = MockAnalyzer.return_value
         instance.fetch_model_data.return_value = {"some": "data"}
@@ -59,7 +72,12 @@ class TestApi(unittest.TestCase):
         self.assertFalse(result.issupported)
 
     @patch("canirun.api.ModelAnalyzer")
-    def test_canirun_fetch_failure(self, MockAnalyzer):
+    def test_canirun_fetch_failure(self, MockAnalyzer: Any) -> None:
+        """Tests canirun when model data fetch fails.
+
+        Args:
+            MockAnalyzer: Mock object for ModelAnalyzer.
+        """
         instance = MockAnalyzer.return_value
         instance.fetch_model_data.return_value = None  # Failure
 

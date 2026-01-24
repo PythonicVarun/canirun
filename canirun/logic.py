@@ -1,19 +1,37 @@
+"""Core logic for model memory analysis and hardware detection."""
+
 import json
 import logging
 import platform
+from typing import Any
 
 import psutil
 import torch
 from huggingface_hub import hf_hub_download, login, model_info
 
 from canirun.enum import COMPATIBILITY
+from canirun.gpu import GPUAnalyzer
 from canirun.human_readable import get_human_readable_size
 
 logger = logging.getLogger(__name__)
 
 
 class ModelAnalyzer:
-    def __init__(self, model_id, verbose=True, hf_token=None):
+    """Analyzes model compatibility with local hardware."""
+
+    def __init__(
+        self,
+        model_id: str,
+        verbose: bool = True,
+        hf_token: str | None = None,
+    ) -> None:
+        """Initializes the ModelAnalyzer.
+
+        Args:
+            model_id: The ID of the model to analyze.
+            verbose: Whether to enable verbose logging. Defaults to True.
+            hf_token: The Hugging Face API token. Defaults to None.
+        """
         self.model_id = model_id
         self.verbose = verbose
         self.hf_token = hf_token
@@ -34,12 +52,17 @@ class ModelAnalyzer:
             f"RAM: {get_human_readable_size(self.specs['ram'])}"
         )
 
-    def _login(self):
+    def _login(self) -> None:
+        """Logs in to Hugging Face using the token (if provided)."""
         if self.hf_token:
             login(self.hf_token)
 
-    def _get_specs(self):
-        """Detects System RAM and VRAM (CUDA or Apple Silicon)."""
+    def _get_specs(self) -> dict[str, Any]:
+        """Detects System RAM and VRAM (CUDA or Apple Silicon).
+
+        Returns:
+            dict[str, Any]: A dictionary containing RAM, VRAM, device name, and Mac status.
+        """
         ram = psutil.virtual_memory().total
         vram = 0
         device_name = "CPU Only"
@@ -55,8 +78,12 @@ class ModelAnalyzer:
 
         return {"ram": ram, "vram": vram, "name": device_name, "is_mac": is_mac}
 
-    def fetch_model_data(self):
-        """Fetches architecture details for accurate GQA and Parameter calculation."""
+    def fetch_model_data(self) -> dict[str, Any] | None:
+        """Fetches architecture details for accurate GQA and Parameter calculation.
+
+        Returns:
+            dict[str, Any] | None: A dictionary containing model architecture details, or None if fetching fails.
+        """
         logger.info(f"Fetching config for: {self.model_id}...")
         try:
             total_params_billions = 0
@@ -96,7 +123,20 @@ class ModelAnalyzer:
                 )
             return None
 
-    def calculate(self, data, ctx=4096):
+    def calculate(
+        self,
+        data: dict[str, Any],
+        ctx: int = 4096,
+    ) -> list[dict[str, Any]]:
+        """Calculates memory requirements and compatibility for different quantization levels.
+
+        Args:
+            data: Model architecture details.
+            ctx: Context length to simulate.
+
+        Returns:
+            list[dict[str, Any]]: Analysis results for each quantization level.
+        """
         if not data:
             return []
 

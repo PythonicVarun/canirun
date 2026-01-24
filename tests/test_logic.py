@@ -1,4 +1,5 @@
 import unittest
+from typing import Any
 from unittest.mock import patch
 
 from canirun.enum import COMPATIBILITY
@@ -6,7 +7,10 @@ from canirun.logic import ModelAnalyzer
 
 
 class TestModelAnalyzer(unittest.TestCase):
-    def setUp(self):
+    """Test suite for the ModelAnalyzer class."""
+
+    def setUp(self) -> None:
+        """Sets up the test environment."""
         self.analyzer = ModelAnalyzer("test-model", verbose=False)
         # Mock specs with bytes
         gb = 1024**3
@@ -17,7 +21,8 @@ class TestModelAnalyzer(unittest.TestCase):
             "is_mac": False,
         }
 
-    def test_calculate_returns_bytes_as_int(self):
+    def test_calculate_returns_bytes_as_int(self) -> None:
+        """Tests that calculate returns memory values as integers."""
         data = {
             "params_billions": 7.0,
             "hidden_size": 4096,
@@ -43,7 +48,15 @@ class TestModelAnalyzer(unittest.TestCase):
 
     @patch("canirun.logic.model_info")
     @patch("canirun.logic.hf_hub_download")
-    def test_fetch_model_data_auth_error(self, mock_download, mock_info):
+    def test_fetch_model_data_auth_error(
+        self, mock_download: Any, mock_info: Any
+    ) -> None:
+        """Tests proper error handling when authentication fails.
+
+        Args:
+            mock_download: Mock for hf_hub_download.
+            mock_info: Mock for model_info.
+        """
         # Setup mock to raise 401 error
         mock_download.side_effect = Exception("401 Client Error: Unauthorized for url")
         mock_info.side_effect = Exception("Some error")

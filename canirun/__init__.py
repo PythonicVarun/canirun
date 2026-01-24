@@ -1,3 +1,5 @@
+"""Canirun: A CLI tool to check if you can run a Hugging Face model locally."""
+
 from .api import AnalysisResult, canirun
 from .enum import COMPATIBILITY
 
