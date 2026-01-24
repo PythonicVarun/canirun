@@ -6,7 +6,6 @@ import platform
 from typing import Any
 
 import psutil
-import torch
 from huggingface_hub import hf_hub_download, login, model_info
 
 from canirun.enum import COMPATIBILITY
@@ -45,6 +44,9 @@ class ModelAnalyzer:
         # Login to Hugging Face if token is provided
         self._login()
 
+        # Initialize GPU Analyzer
+        self._gpu_analyzer = GPUAnalyzer(verbose=self.verbose)
+
         self.specs = self._get_specs()
         logger.info(
             f"Detected Hardware: {self.specs['name']} | "
@@ -69,9 +71,9 @@ class ModelAnalyzer:
 
         is_mac = platform.system() == "Darwin" and platform.machine() == "arm64"
 
-        if torch.cuda.is_available():
-            vram = torch.cuda.get_device_properties(0).total_memory
-            device_name = torch.cuda.get_device_name(0)
+        if self._gpu_analyzer.is_gpu_available():
+            vram = self._gpu_analyzer.vram
+            device_name = self._gpu_analyzer.device_name
         elif is_mac:
             vram = ram * 0.75
             device_name = "Apple Silicon (Unified Memory)"
@@ -139,7 +141,6 @@ class ModelAnalyzer:
         """
         if not data:
             return []
-
         # Model Weights Calculation
         params = data["params_billions"]
         if params == 0:
