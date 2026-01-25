@@ -94,7 +94,7 @@ class TestGPUAnalyzer(unittest.TestCase):
     def test_multiple_gpus(self, mock_run: MagicMock, mock_which: MagicMock) -> None:
         """Tests detection of multiple GPUs."""
         mock_which.return_value = "nvidia-smi"
-        output = "0, GPU A, 8000\n" "1, GPU B, 12000"
+        output = "0, GPU A, 8000\n1, GPU B, 12000"
         mock_run.return_value.stdout = output
         mock_run.return_value.returncode = 0
 
