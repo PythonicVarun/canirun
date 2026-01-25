@@ -1,38 +1,172 @@
 name: Publish to PyPI
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_run:
+    workflows: ["Tests"]
+    types: [completed]
+    branches: []
 
 permissions:
   contents: write
 
 jobs:
-  get-version:
+  setup:
+    name: Pre-flight Check
     runs-on: ubuntu-latest
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      startsWith(github.event.workflow_run.head_branch, 'v')
     outputs:
+      is_release: ${{ steps.check.outputs.is_release }}
       version: ${{ steps.version.outputs.version }}
+      tag_name: ${{ steps.check.outputs.tag_name }}
+      commit_sha: ${{ steps.check.outputs.commit_sha }}
     steps:
-      - name: Extract version
-        id: version
+      - name: Determine trigger context
+        id: context
         run: |
-          VERSION=${GITHUB_REF_NAME#v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          if [ "${{ github.event_name }}" == "push" ]; then
+            echo "trigger_type=direct_tag" >> $GITHUB_OUTPUT
+            echo "tag_name=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            echo "commit_sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "trigger_type=workflow_run" >> $GITHUB_OUTPUT
+            echo "tag_name=${{ github.event.workflow_run.head_branch }}" >> $GITHUB_OUTPUT
+            echo "commit_sha=${{ github.event.workflow_run.head_sha }}" >> $GITHUB_OUTPUT
+          fi
 
-  build-and-release:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.context.outputs.commit_sha }}
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Verify Tag
+        id: check
+        run: |
+          TRIGGER_NAME="${{ steps.context.outputs.tag_name }}"
+          TRIGGER_SHA="${{ steps.context.outputs.commit_sha }}"
+          TRIGGER_TYPE="${{ steps.context.outputs.trigger_type }}"
+
+          echo "🔎 Analyzing trigger: $TRIGGER_NAME ($TRIGGER_SHA)"
+          echo "Trigger type: $TRIGGER_TYPE"
+
+          # Version tag regex
+          # Matches: v1.2.3, v1.2.3a1, v1.2.3b2, v1.2.3rc1, v1.2.3.post1, v1.2.3.dev0
+          if [[ ! "$TRIGGER_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(a|b|rc|\.post|\.dev)?[0-9]*$ ]]; then
+            echo "::notice::Skipping: '$TRIGGER_NAME' is not a valid release tag."
+            echo "Expected format: vX.Y.Z or vX.Y.Z{a,b,rc,.post,.dev}N"
+            echo "is_release=false" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if ! git fetch origin "refs/tags/$TRIGGER_NAME:refs/tags/$TRIGGER_NAME" 2>&1; then
+            echo "::warning::Failed to fetch tag $TRIGGER_NAME - may not exist yet"
+          fi
+
+          # Check if this is actually a tag
+          TAG_SHA=$(git rev-list -n 1 "refs/tags/$TRIGGER_NAME" 2>/dev/null || echo "NOT_FOUND")
+
+          if [ "$TAG_SHA" == "NOT_FOUND" ]; then
+              echo "::notice::Skipping: Tag 'refs/tags/$TRIGGER_NAME' does not exist."
+              echo "is_release=false" >> $GITHUB_OUTPUT
+              exit 0
+          fi
+
+          if [ "$TAG_SHA" != "$TRIGGER_SHA" ]; then
+              echo "::warning::SHA Mismatch - not a tag release!"
+              echo "   - Event SHA: $TRIGGER_SHA (The code that was tested)"
+              echo "   - Tag SHA:   $TAG_SHA (The actual tag)"
+              echo "   This is likely a branch named '$TRIGGER_NAME', not the tag."
+              echo "is_release=false" >> $GITHUB_OUTPUT
+              exit 0
+          fi
+
+          # Check if this version already exists on PyPI
+          VERSION="${TRIGGER_NAME#v}"
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "https://pypi.org/pypi/canirun/$VERSION/json")
+
+          if [ "$HTTP_CODE" == "200" ]; then
+            echo "::warning::Version $VERSION already exists on PyPI. Skipping republish."
+            echo "is_release=false" >> $GITHUB_OUTPUT
+            exit 0
+          elif [ "$HTTP_CODE" != "404" ]; then
+            echo "::error::Unable to verify PyPI status (HTTP $HTTP_CODE). Aborting for safety."
+            echo "Check https://pypi.org/pypi/canirun/$VERSION/json manually."
+            echo "is_release=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+          echo "✅ Verified: Valid release tag with matching commit."
+          echo "is_release=true" >> $GITHUB_OUTPUT
+          echo "tag_name=$TRIGGER_NAME" >> $GITHUB_OUTPUT
+          echo "commit_sha=$TRIGGER_SHA" >> $GITHUB_OUTPUT
+
+      - name: Extract Version
+        id: version
+        if: steps.check.outputs.is_release == 'true'
+        run: |
+          VERSION="${{ steps.check.outputs.tag_name }}"
+          echo "version=${VERSION#v}" >> $GITHUB_OUTPUT
+
+      - name: Verify package version matches tag
+        if: steps.check.outputs.is_release == 'true'
+        run: |
+          TAG_VERSION="${{ steps.version.outputs.version }}"
+          VERSION_MISMATCH=0
+
+          # Check pyproject.toml
+          if [ -f "pyproject.toml" ]; then
+            PKG_VERSION=$(grep -E '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/' | tr -d ' ')
+            if [ -n "$PKG_VERSION" ]; then
+              if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
+                echo "::error::pyproject.toml version mismatch!"
+                echo "  Tag version: $TAG_VERSION"
+                echo "  pyproject.toml version: $PKG_VERSION"
+                VERSION_MISMATCH=1
+              else
+                echo "✅ pyproject.toml version matches: $TAG_VERSION"
+              fi
+            fi
+          fi
+
+          # Check canirun/__init__.py
+          if [ -f "canirun/__init__.py" ]; then
+            INIT_VERSION=$(grep -E '^__version__ = ' canirun/__init__.py | sed 's/__version__ = "\(.*\)"/\1/' | tr -d ' ' || echo "")
+            if [ -n "$INIT_VERSION" ]; then
+              if [ "$INIT_VERSION" != "$TAG_VERSION" ]; then
+                echo "::error::__init__.py version mismatch!"
+                echo "  Tag version: $TAG_VERSION"
+                echo "  __init__.py __version__: $INIT_VERSION"
+                VERSION_MISMATCH=1
+              else
+                echo "✅ __init__.py __version__ matches: $TAG_VERSION"
+              fi
+            fi
+          fi
+
+          if [ $VERSION_MISMATCH -eq 1 ]; then
+            echo "is_release=false" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+  publish:
     name: Build and Release
-    needs: get-version
+    needs: setup
+    if: needs.setup.outputs.is_release == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
       id-token: write
     environment:
       name: pypi
-      url: https://pypi.org/project/canirun/${{ needs.get-version.outputs.version }}/
+      url: https://pypi.org/project/canirun/${{ needs.setup.outputs.version }}/
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.setup.outputs.commit_sha }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -49,8 +183,8 @@ jobs:
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
         with:
+          tag_name: ${{ needs.setup.outputs.tag_name }}
           files: dist/*
           generate_release_notes: true
 
