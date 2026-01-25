@@ -74,11 +74,19 @@ class TestModelAnalyzer(unittest.TestCase):
             self.assertTrue(found_tip, f"Tip not found in logs: {cm.output}")
 
     @patch("canirun.logic.GPUAnalyzer")
+    @patch("platform.machine")
+    @patch("platform.system")
     @patch("psutil.virtual_memory")
-    def test_get_specs_with_gpu(self, mock_vm: Any, MockGPU: Any) -> None:
+    def test_get_specs_with_gpu(
+        self, mock_vm: Any, mock_system: Any, mock_machine: Any, MockGPU: Any
+    ) -> None:
         """Tests that _get_specs correctly prioritizes GPU over CPU/Mac."""
         # Setup RAM
         mock_vm.return_value.total = 32 * 1024**3
+
+        # Setup Linux Environment
+        mock_system.return_value = "Linux"
+        mock_machine.return_value = "x86_64"
 
         # Setup GPU
         mock_gpu_instance = MockGPU.return_value
