@@ -58,7 +58,7 @@ ignore = ["E501"]
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
-[dependency-groups]
+[project.optional-dependencies]
 dev = [
     "black>=26.1.0",
     "isort>=7.0.0",
