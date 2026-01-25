@@ -73,6 +73,78 @@ class TestModelAnalyzer(unittest.TestCase):
             )
             self.assertTrue(found_tip, f"Tip not found in logs: {cm.output}")
 
+    @patch("canirun.logic.GPUAnalyzer")
+    @patch("psutil.virtual_memory")
+    def test_get_specs_with_gpu(self, mock_vm: Any, MockGPU: Any) -> None:
+        """Tests that _get_specs correctly prioritizes GPU over CPU/Mac."""
+        # Setup RAM
+        mock_vm.return_value.total = 32 * 1024**3
+
+        # Setup GPU
+        mock_gpu_instance = MockGPU.return_value
+        mock_gpu_instance.is_gpu_available.return_value = True
+        mock_gpu_instance.vram = 24 * 1024**3
+        mock_gpu_instance.device_name = "NVIDIA RTX 3090"
+
+        # Initialize analyzer
+        analyzer = ModelAnalyzer("test-model", verbose=False)
+
+        self.assertEqual(analyzer.specs["vram"], 24 * 1024**3)
+        self.assertEqual(analyzer.specs["name"], "NVIDIA RTX 3090")
+        self.assertFalse(analyzer.specs["is_mac"])
+
+    @patch("canirun.logic.GPUAnalyzer")
+    @patch("platform.machine")
+    @patch("platform.system")
+    @patch("psutil.virtual_memory")
+    def test_get_specs_mac_silicon(
+        self, mock_vm: Any, mock_system: Any, mock_machine: Any, MockGPU: Any
+    ) -> None:
+        """Tests that _get_specs correctly detects Apple Silicon."""
+        # Setup RAM
+        mock_vm.return_value.total = 16 * 1024**3
+
+        # Setup Mac Environment
+        mock_system.return_value = "Darwin"
+        mock_machine.return_value = "arm64"
+
+        # Setup GPU (No discrete GPU)
+        mock_gpu_instance = MockGPU.return_value
+        mock_gpu_instance.is_gpu_available.return_value = False
+
+        analyzer = ModelAnalyzer("test-model", verbose=False)
+
+        self.assertTrue(analyzer.specs["is_mac"])
+        self.assertEqual(analyzer.specs["name"], "Apple Silicon (Unified Memory)")
+        # Check VRAM calculation (75% of RAM)
+        expected_vram = 16 * 1024**3 * 0.75
+        self.assertEqual(analyzer.specs["vram"], expected_vram)
+
+    def test_calculate_fallback_params(self) -> None:
+        """Tests calculation fallback when params_billions is 0."""
+        # Data with 0 params but architecture details
+        data = {
+            "params_billions": 0,
+            "hidden_size": 1024,
+            "num_hidden_layers": 10,
+            "num_attention_heads": 8,
+            "num_key_value_heads": 8,
+            "vocab_size": 1000,
+        }
+
+        results = self.analyzer.calculate(data, ctx=1024)
+        self.assertTrue(len(results) > 0)
+
+        # Verify params were calculated
+        # block = 12 * 10 * 1024^2 = 120 * 1,048,576 = 125M
+        # embed = 1000 * 1024 = 1M
+        # Total = 126M params -> 0.126B
+        # FP16 size = 0.25 GB
+
+        res_fp16 = results[0]
+        self.assertEqual(res_fp16["quant"], "FP16")
+        self.assertGreater(res_fp16["total_ram"], 0)
+
 
 if __name__ == "__main__":
     unittest.main()
